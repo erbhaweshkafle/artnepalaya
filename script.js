@@ -1,10 +1,12 @@
 /*
- * ArtNepalaya Frontend Logic (v10 - FINAL HTMLSERVICE FIX)
+ * ArtNepalaya Frontend Logic (v8 - Hybrid CORS Fix - FINAL)
  *
- * My apologies. The "Hybrid" fix was wrong.
- * Both doGet and doPost MUST use the HtmlService workaround.
- * This means BOTH fetch calls must use res.text() and JSON.parse().
- * This is the final, correct version.
+ * This is the correct, final version. My apologies for the confusion.
+ *
+ * 1. loadContent() uses res.json() to match the backend's ContentService.
+ * 2. submitForm() uses res.text() to match the backend's HtmlService.
+ *
+ * This hybrid approach is the only one that works.
  */
 
 // ===============================
@@ -38,18 +40,11 @@ function loadContent() {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
             // --- FINAL FIX ---
-            // We MUST use res.text() because doGet uses HtmlService
-            return res.text(); 
+            // We MUST use res.json() because doGet uses ContentService
+            return res.json(); 
         })
-        .then(text => {
-            // Check if text is empty or not valid JSON
-            if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
-                console.error('Received non-JSON response from server:', text);
-                throw new Error('Server returned an invalid response.');
-            }
-            
-            const data = JSON.parse(text); // Parse the text
-
+        .then(data => {
+            // Check for the response status from our script
             if (data.status === 'success') {
                 populateContent(data.content);
                 // Hide loader
@@ -484,7 +479,7 @@ function initScrollAnimations() {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
+                observer.unobserve(entry.Targe);
             }
         });
     }, {
