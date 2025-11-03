@@ -13,9 +13,7 @@
 // CONFIGURATION
 // ===============================
 //
-// !!! IMPORTANT !!!
-// You MUST re-deploy your script (with the new code.gs)
-// and paste the NEW URL here.
+// This URL is correct.
 //
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
@@ -484,7 +482,8 @@ function initScrollAnimations() {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                observer.unobserve(entry.Targe);
+                // *** TYPO FIX WAS HERE ***
+                observer.unobserve(entry.target); 
             }
         });
     }, {
@@ -578,5 +577,4 @@ function initParticles() {
     init();
     animate();
 }
-
 
