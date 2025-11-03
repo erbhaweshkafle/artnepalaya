@@ -560,5 +560,3 @@ function initParticles() {
     animate();
 }
 
-
-
