@@ -1,28 +1,15 @@
 /*
- * ArtNepalaya Frontend Logic (v8 - Hybrid CORS Fix)
+ * ArtNepalaya Frontend Logic (v10 - FINAL HTMLSERVICE FIX)
  *
- * This file handles:
- * 1. Fetching content from the Google Sheet CMS.
- * 2. Rendering the dynamic content onto the page.
- * 3. Handling the multi-step survey form logic.
- * 4. Submitting the form data to the Google Apps Script.
- * 5. Showing success/error messages.
- * 6. Scroll animations.
- *
- * --- NOTE ON HYBRID CORS FIX ---
- * doGet() (for loading) is a simple GET request. We can use ContentService
- * and res.json() as Google adds the correct headers automatically.
- *
- * doPost() (for submitting) is a complex request. We MUST keep the
- * HtmlService workaround (res.text() and JSON.parse()) to handle the preflight.
+ * My apologies. The "Hybrid" fix was wrong.
+ * Both doGet and doPost MUST use the HtmlService workaround.
+ * This means BOTH fetch calls must use res.text() and JSON.parse().
+ * This is the final, correct version.
  */
 
 // ===============================
 // CONFIGURATION
 // ===============================
-//
-// This URL is correct.
-//
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
@@ -50,12 +37,19 @@ function loadContent() {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
-            // --- HYBRID FIX ---
-            // doGet is now a simple request, so we can use res.json()
-            return res.json();
+            // --- FINAL FIX ---
+            // We MUST use res.text() because doGet uses HtmlService
+            return res.text(); 
         })
-        .then(data => {
-            // Check for the response status from our script
+        .then(text => {
+            // Check if text is empty or not valid JSON
+            if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
+                console.error('Received non-JSON response from server:', text);
+                throw new Error('Server returned an invalid response.');
+            }
+            
+            const data = JSON.parse(text); // Parse the text
+
             if (data.status === 'success') {
                 populateContent(data.content);
                 // Hide loader
@@ -84,7 +78,12 @@ function populateContent(content) {
     // We need to parse the colorTheme JSON string first
     let colors = {};
     if (typeof content.colorTheme === 'string') {
-        colors = JSON.parse(content.colorTheme);
+        try {
+            colors = JSON.parse(content.colorTheme);
+        } catch (e) {
+            console.error("Could not parse colorTheme JSON: ", e);
+            colors = {}; // Use defaults
+        }
     } else {
         colors = content.colorTheme || {};
     }
@@ -101,9 +100,14 @@ function populateContent(content) {
         // Ensure socialLinks is parsed if it's a string
         let socialLinks = [];
         if (typeof content.socialLinks === 'string') {
-            socialLinks = JSON.parse(content.socialLinks);
+             try {
+                socialLinks = JSON.parse(content.socialLinks);
+             } catch (e) {
+                console.error("Could not parse socialLinks JSON: ", e);
+                socialLinks = [];
+             }
         } else {
-            socialLinks = content.socialLinks;
+            socialLinks = content.socialLinks || [];
         }
         
         socialNav.innerHTML = socialLinks.map(link => `
@@ -190,9 +194,14 @@ function populateContent(content) {
     if (partnersGrid && content.partnersLogos) { // Use partnersLogos
         let partners = [];
         if (typeof content.partnersLogos === 'string') {
-            partners = JSON.parse(content.partnersLogos);
+            try {
+                partners = JSON.parse(content.partnersLogos);
+            } catch (e) {
+                console.error("Could not parse partnersLogos JSON: ", e);
+                partners = [];
+            }
         } else {
-            partners = content.partnersLogos;
+            partners = content.partnersLogos || [];
         }
 
         partnersGrid.innerHTML = partners.map(partner => `
@@ -213,9 +222,13 @@ function populateContent(content) {
     if (finalCtaLinks && content.socialLinks) { // We can re-use the socialLinks variable from above
         let socialLinks = [];
         if (typeof content.socialLinks === 'string') {
-            socialLinks = JSON.parse(content.socialLinks);
+             try {
+                socialLinks = JSON.parse(content.socialLinks);
+             } catch (e) {
+                 socialLinks = [];
+             }
         } else {
-            socialLinks = content.socialLinks;
+            socialLinks = content.socialLinks || [];
         }
 
          finalCtaLinks.innerHTML = socialLinks.map(link => `
@@ -405,8 +418,8 @@ function submitForm(form, submitBtn) {
         if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`);
         }
-        // --- HYBRID FIX ---
-        // doPost MUST still use the HtmlService workaround (res.text())
+        // --- FINAL FIX ---
+        // We MUST use res.text() because doPost uses HtmlService
         return res.text();
     })
     .then(text => {
