@@ -1,16 +1,22 @@
 /*
  * ArtNepalaya Frontend Logic (v9 - HTML Mismatch Fix)
  *
- * This version fixes the JavaScript to match the new HTML structure (v9).
- * - Rewritten initFormLogic() to use "btn-next", "btn-prev", "btn-submit".
- * - Rewritten persona selection to use ".btn-toggle".
- * - Fixed "entry.Targe" typo again.
- * - Kept the "Hybrid CORS" fix (res.json() for GET, res.text() for POST).
+ * This is the final, correct, "Hybrid" version.
+ * - This JS matches the "v9" index.html and style.css
+ * - loadContent() uses res.json() (for ContentService)
+ * - submitForm() uses res.text() (for HtmlService)
+ * - "entry.Targe" typo is fixed.
+ * - Form logic is rewritten for "btn-next", etc.
  */
 
 // ===============================
 // CONFIGURATION
 // ===============================
+//
+// !!! IMPORTANT !!!
+// You MUST paste your NEW deployment URL here
+// (after re-deploying the code.gs file)
+//
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
@@ -20,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadContent();
     initFormLogic();
     initScrollAnimations();
-    // initParticles(); // Removing particle init to simplify debugging. Let's get the form working first.
+    // Particles are initialized *after* content loads
 });
 
 // ===============================
@@ -31,6 +37,17 @@ function loadContent() {
     const loader = document.getElementById('loader-container');
     const contentWrapper = document.getElementById('content-wrapper');
     
+    // Check if URL has been replaced
+    if (APPS_SCRIPT_URL === 'PASTE_YOUR_NEW_DEPLOYMENT_URL_HERE') {
+        console.error('ERROR: APPS_SCRIPT_URL has not been set in script.js.');
+        const loaderText = loader.querySelector('p');
+        if (loaderText) {
+            loaderText.textContent = 'Configuration Error: App URL is missing.';
+            loaderText.style.color = 'var(--color-primary-red)';
+        }
+        return; // Stop execution
+    }
+
     fetch(`${APPS_SCRIPT_URL}?action=getContent`)
         .then(res => {
             if (!res.ok) {
@@ -80,14 +97,18 @@ function populateContent(content) {
     };
     
     // 0. Apply dynamic colors
-    let colors = parseJson(content.colorTheme);
-    if (!Array.isArray(colors) && typeof colors === 'object') {
-         applyColors(colors);
-    } else if (Array.isArray(colors) && colors.length > 0) {
-        applyColors(colors[0]); // Handle if it was parsed as array
-    } else if (typeof content.colorTheme === 'object') {
-        applyColors(content.colorTheme); // Handle if it's already an object
+    let colors = {};
+     if (typeof content.colorTheme === 'string') {
+        try {
+            colors = JSON.parse(content.colorTheme);
+        } catch (e) {
+            console.error("Could not parse colorTheme JSON: ", e);
+            colors = {}; // Use defaults
+        }
+    } else {
+        colors = content.colorTheme || {};
     }
+    applyColors(colors); // Pass the inner color object
 
     // 1. Hero Section
     setElementText('hero-title', content.heroTitle);
@@ -241,6 +262,8 @@ let currentStep = 1;
 
 function initFormLogic() {
     const surveyForm = document.getElementById('survey-form');
+    if (!surveyForm) return; // Stop if form doesn't exist
+
     const nextBtn = document.getElementById('btn-next');
     const prevBtn = document.getElementById('btn-prev');
     const submitBtn = document.getElementById('btn-submit');
@@ -271,15 +294,19 @@ function initFormLogic() {
     });
 
     // --- Navigation Logic ---
-    nextBtn.addEventListener('click', () => {
-        if (validateStep(currentStep)) {
-            goToStep(currentStep + 1);
-        }
-    });
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (validateStep(currentStep)) {
+                goToStep(currentStep + 1);
+            }
+        });
+    }
 
-    prevBtn.addEventListener('click', () => {
-        goToStep(currentStep - 1);
-    });
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            goToStep(currentStep - 1);
+        });
+    }
 
     // --- Form Submission ---
     surveyForm.addEventListener('submit', (e) => {
@@ -308,13 +335,15 @@ function initFormLogic() {
         }
         
         // Update button visibility
-        prevBtn.style.display = (currentStep === 1) ? 'none' : 'inline-block';
-        nextBtn.style.display = (currentStep === totalSteps) ? 'none' : 'inline-block';
-        submitBtn.style.display = (currentStep === totalSteps) ? 'inline-block' : 'none';
+        if (prevBtn) prevBtn.style.display = (currentStep === 1) ? 'none' : 'inline-block';
+        if (nextBtn) nextBtn.style.display = (currentStep === totalSteps) ? 'none' : 'inline-block';
+        if (submitBtn) submitBtn.style.display = (currentStep === totalSteps) ? 'inline-block' : 'none';
         
         // Update progress bar
-        const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
-        progressBar.style.width = `${progressPercent}%`;
+        if (progressBar) {
+            const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+        }
     }
 
     function updatePersonaQuestions() {
@@ -350,7 +379,20 @@ function validateStep(stepNumber) {
         }
 
         if (input.type === 'checkbox' || input.type === 'radio') {
-             // Logic for checkbox/radio groups
+             // Basic validation: check if at least one in a group is checked
+             const groupName = input.name;
+             if (groupName && input.dataset.required === "true") {
+                 const checked = currentStepEl.querySelector(`input[name="${groupName}"]:checked`);
+                 if (!checked) {
+                    isValid = false;
+                    // Find the label for this group to show error
+                    const groupLabel = document.getElementById(`${groupName}_label`);
+                    if(groupLabel) groupLabel.classList.add('input-error');
+                 } else {
+                    const groupLabel = document.getElementById(`${groupName}_label`);
+                    if(groupLabel) groupLabel.classList.remove('input-error');
+                 }
+             }
         } else {
             if (input.value.trim() === '') {
                 isValid = false;
@@ -429,8 +471,12 @@ function submitForm(form, submitBtn) {
             showMessage('✅ Thank you! Your survey has been submitted.', 'success');
             // Hide the form, show a thank you message
             form.style.display = 'none';
-            document.getElementById('form-title').textContent = "Thank You!";
-            document.getElementById('form-subtitle').textContent = "Your voice has been heard. Follow us on social media to stay connected!";
+            // Also hide progress bar
+            const progressBar = document.getElementById('form-progress');
+            if(progressBar) progressBar.style.display = 'none';
+
+            setElementText('form-title', "Thank You!");
+            setElementText('form-subtitle', "Your voice has been heard. Follow us on social media to stay connected!");
         } else {
             throw new Error(responseData.message || 'An unknown error occurred.');
         }
@@ -505,6 +551,7 @@ function initParticles() {
     const heroElement = canvas.parentElement; // The #hero section
 
     function resizeCanvas() {
+        if (!heroElement) return;
         canvas.width = heroElement.clientWidth;
         canvas.height = heroElement.clientHeight;
         init();
@@ -519,9 +566,21 @@ function initParticles() {
             this.speedX = Math.random() * 0.5 - 0.25;
             this.speedY = Math.random() * 0.5 - 0.25;
             // Get color from CSS variable
-            this.color = getComputedStyle(document.documentElement)
-                         .getPropertyValue('--color-accent') || 'rgba(253, 184, 19, 0.5)';
-            this.color = this.color.trim() + '80'; // Add alpha
+            let accentColor = getComputedStyle(document.documentElement)
+                                .getPropertyValue('--color-accent') || '#FDB813';
+            accentColor = accentColor.trim();
+            // Need to convert hex to rgba
+            let r=0, g=0, b=0;
+            if(accentColor.length === 7) {
+                r = parseInt(accentColor.substring(1, 3), 16);
+                g = parseInt(accentColor.substring(3, 5), 16);
+                b = parseInt(accentColor.substring(5, 7), 16);
+            } else if (accentColor.length === 4) {
+                r = parseInt(accentColor.substring(1, 2) + accentColor.substring(1, 2), 16);
+                g = parseInt(accentColor.substring(2, 3) + accentColor.substring(2, 3), 16);
+                b = parseInt(accentColor.substring(3, 4) + accentColor.substring(3, 4), 16);
+            }
+            this.color = `rgba(${r}, ${g}, ${b}, 0.5)`;
         }
         update() {
             if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
@@ -540,6 +599,7 @@ function initParticles() {
     // Initialize particles
     function init() {
         particlesArray = [];
+        if (canvas.width === 0 || canvas.height === 0) return;
         for (let i = 0; i < particleCount; i++) {
             particlesArray.push(new Particle());
         }
@@ -547,6 +607,7 @@ function initParticles() {
 
     // Animation loop
     function animate() {
+        if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         for (let i = 0; i < particlesArray.length; i++) {
             particlesArray[i].update();
@@ -565,4 +626,3 @@ function initParticles() {
         animate();
     }, 100); 
 }
-
