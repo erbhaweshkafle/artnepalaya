@@ -1,20 +1,16 @@
 /*
- * ArtNepalaya Frontend Logic (v8 - Hybrid CORS Fix - FINAL)
+ * ArtNepalaya Frontend Logic (v9 - HTML Mismatch Fix)
  *
- * This is the correct, final version. My apologies for the confusion.
- *
- * 1. loadContent() uses res.json() to match the backend's ContentService.
- * 2. submitForm() uses res.text() to match the backend's HtmlService.
- *
- * This hybrid approach is the only one that works.
+ * This version fixes the JavaScript to match the new HTML structure (v9).
+ * - Rewritten initFormLogic() to use "btn-next", "btn-prev", "btn-submit".
+ * - Rewritten persona selection to use ".btn-toggle".
+ * - Fixed "entry.Targe" typo again.
+ * - Kept the "Hybrid CORS" fix (res.json() for GET, res.text() for POST).
  */
 
 // ===============================
 // CONFIGURATION
 // ===============================
-//
-// This URL is correct.
-//
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
@@ -24,35 +20,34 @@ document.addEventListener('DOMContentLoaded', () => {
     loadContent();
     initFormLogic();
     initScrollAnimations();
-    initParticles();
+    // initParticles(); // Removing particle init to simplify debugging. Let's get the form working first.
 });
 
 // ===============================
 // 1. CONTENT LOADING
 // ===============================
 
-/**
- * Fetches the site content from the Google Apps Script.
- */
 function loadContent() {
     const loader = document.getElementById('loader-container');
+    const contentWrapper = document.getElementById('content-wrapper');
     
     fetch(`${APPS_SCRIPT_URL}?action=getContent`)
         .then(res => {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
-            // --- FINAL FIX ---
+            // --- HYBRID FIX (Correct) ---
             // We MUST use res.json() because doGet uses ContentService
             return res.json(); 
         })
         .then(data => {
-            // Check for the response status from our script
             if (data.status === 'success') {
                 populateContent(data.content);
-                // Hide loader
-                loader.style.opacity = '0';
-                setTimeout(() => loader.style.display = 'none', 400);
+                // Hide loader and show content
+                loader.style.display = 'none';
+                contentWrapper.style.display = 'block';
+                // NOW initialize particles, after content is loaded
+                initParticles(); 
             } else {
                 throw new Error(data.message || 'Failed to parse content.');
             }
@@ -69,174 +64,124 @@ function loadContent() {
 
 /**
  * Populates the HTML with the fetched content.
- * (FIXED to match the user's provided JSON structure)
  */
 function populateContent(content) {
-    // 0. Apply dynamic colors
-    // We need to parse the colorTheme JSON string first
-    let colors = {};
-    if (typeof content.colorTheme === 'string') {
-        try {
-            colors = JSON.parse(content.colorTheme);
-        } catch (e) {
-            console.error("Could not parse colorTheme JSON: ", e);
-            colors = {}; // Use defaults
+    // Helper to safely parse JSON from the sheet
+    const parseJson = (jsonString) => {
+        if (typeof jsonString === 'string') {
+            try {
+                return JSON.parse(jsonString);
+            } catch (e) {
+                console.error("Failed to parse JSON string:", jsonString, e);
+                return []; // Return empty array on failure
+            }
         }
-    } else {
-        colors = content.colorTheme || {};
+        return Array.isArray(jsonString) ? jsonString : []; // Return as-is if already array
+    };
+    
+    // 0. Apply dynamic colors
+    let colors = parseJson(content.colorTheme);
+    if (!Array.isArray(colors) && typeof colors === 'object') {
+         applyColors(colors);
+    } else if (Array.isArray(colors) && colors.length > 0) {
+        applyColors(colors[0]); // Handle if it was parsed as array
+    } else if (typeof content.colorTheme === 'object') {
+        applyColors(content.colorTheme); // Handle if it's already an object
     }
-    applyColors(colors); // Pass the inner color object
 
     // 1. Hero Section
     setElementText('hero-title', content.heroTitle);
     setElementText('hero-subtitle', content.heroSubtitle);
-    setElementText('hero-cta-btn', content.heroCtaText);
+    setElementText('hero-cta', content.heroCtaText);
 
     // 2. Social Links
     const socialNav = document.getElementById('social-links-nav');
+    const footerSocial = document.getElementById('footer-social-links');
     if (socialNav && content.socialLinks) {
-        // Ensure socialLinks is parsed if it's a string
-        let socialLinks = [];
-        if (typeof content.socialLinks === 'string') {
-             try {
-                socialLinks = JSON.parse(content.socialLinks);
-             } catch (e) {
-                console.error("Could not parse socialLinks JSON: ", e);
-                socialLinks = [];
-             }
-        } else {
-            socialLinks = Array.isArray(content.socialLinks) ? content.socialLinks : [];
-        }
+        let socialLinks = parseJson(content.socialLinks);
         
-        socialNav.innerHTML = socialLinks.map(link => `
-            <a href="${link.url}" target="_blank" rel="noopener noreferrer" title="${link.name}" class="btn btn-icon">
+        const linksHtml = socialLinks.map(link => `
+            <a href="${link.url}" target="_blank" rel="noopener noreferrer" title="${link.name}" class="social-icon">
                 <i class="icon-${link.name.toLowerCase()}"></i>
             </a>
         `).join('');
+        
+        socialNav.innerHTML = linksHtml;
+        if(footerSocial) {
+            footerSocial.innerHTML = linksHtml; // Also populate footer social
+        }
+
+        // Find the "Instagram" link for the final CTA button
+        const instaLink = socialLinks.find(link => link.name.toLowerCase() === 'instagram');
+        const finalCtaBtn = document.getElementById('final-cta-btn');
+        if (finalCtaBtn && instaLink) {
+            finalCtaBtn.href = instaLink.url;
+        }
     }
 
-    // 3. Pain Points (Market Lack)
-    setElementText('pain-title', content.painPointsTitle); // Use painPointsTitle
-    const painGrid = document.getElementById('pain-grid');
-    if (painGrid) {
-        // Manually build from individual keys
-        painGrid.innerHTML = `
-            <div class="card fade-in">
-                <h3>${content.painPoint1Title || ''}</h3>
-                <p>${content.painPoint1Text || ''}</p>
-            </div>
-            <div class="card fade-in">
-                <h3>${content.painPoint2Title || ''}</h3>
-                <p>${content.painPoint2Text || ''}</p>
-            </div>
-            <div class="card fade-in">
-                <h3>${content.painPoint3Title || ''}</h3>
-                <p>${content.painPoint3Text || ''}</p>
-            </div>
-        `;
-    }
+    // 3. Pain Points
+    setElementText('pain-points-title', content.painPointsTitle);
+    setElementText('pain-point1-title', content.painPoint1Title);
+    setElementText('pain-point1-text', content.painPoint1Text);
+    setElementText('pain-point2-title', content.painPoint2Title);
+    setElementText('pain-point2-text', content.painPoint2Text);
+    setElementText('pain-point3-title', content.painPoint3Title);
+    setElementText('pain-point3-text', content.painPoint3Text);
 
     // 4. "How It Works" Section
-    setElementText('how-title', content.howItWorksTitle); // Use howItWorksTitle
-    const howGrid = document.getElementById('how-grid');
-    if (howGrid) {
-        // Manually build from individual keys
-        // Note: The SVGs are hardcoded here, you can move them to the sheet if needed
-        howGrid.innerHTML = `
-            <div class="how-step-card fade-in">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                <h3>${content.howItWorksStep1Title || ''}</h3>
-                <p>${content.howItWorksStep1Text || ''}</p>
-            </div>
-            <div class="how-step-card fade-in">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-                <h3>${content.howItWorksStep2Title || ''}</h3>
-                <p>${content.howItWorksStep2Text || ''}</p>
-            </div>
-            <div class="how-step-card fade-in">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z"></path><path d="M12 16.5V12"></path><path d="M12 8.5h.01"></path></svg>
-                <h3>${content.howItWorksStep3Title || ''}</h3>
-                <p>${content.howItWorksStep3Text || ''}</p>
-            </div>
-        `;
-    }
-
-    // 5. "Why Join?" (Benefits) Section
-    setElementText('why-title', content.whyJoinTitle); // Use whyJoinTitle
-    const whyGrid = document.getElementById('why-grid');
-    if (whyGrid) {
-        // Manually build from individual keys
-        whyGrid.innerHTML = `
-            <li class="fade-in">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-check"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                <p><strong>${content.whyJoinBenefit1Title || ''}:</strong> ${content.whyJoinBenefit1Text || ''}</p>
-            </li>
-            <li class="fade-in">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-check"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                <p><strong>${content.whyJoinBenefit2Title || ''}:</strong> ${content.whyJoinBenefit2Text || ''}</p>
-            </li>
-            <li class="fade-in">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-check"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                <p><strong>${content.whyJoinBenefit3Title || ''}:</strong> ${content.whyJoinBenefit3Text || ''}</p>
-            </li>
-        `;
-    }
+    setElementText('how-it-works-title', content.howItWorksTitle);
+    setElementText('how-it-works-step1-title', content.howItWorksStep1Title);
+    setElementText('how-it-works-step1-text', content.howItWorksStep1Text);
+    setElementText('how-it-works-step2-title', content.howItWorksStep2Title);
+    setElementText('how-it-works-step2-text', content.howItWorksStep2Text);
+    setElementText('how-it-works-step3-title', content.howItWorksStep3Title);
+    setElementText('how-it-works-step3-text', content.howItWorksStep3Text);
     
-    // 6. Mission Section
-    setElementText('mission-title', content.aboutTitle); // Use aboutTitle
-    setElementText('mission-text', content.aboutText); // Use aboutText
+    // 5. "Who Is It For" Section
+    setElementText('who-is-it-for-title', content.whoIsItForTitle);
+    setElementText('persona-creator-title', content.personaCreatorTitle);
+    setElementText('persona-creator-text', content.personaCreatorText);
+    setElementText('persona-business-title', content.personaBusinessTitle);
+    setElementText('persona-business-text', content.personaBusinessText);
+    setElementText('persona-enthusiast-title', content.personaEnthusiastTitle);
+    setElementText('persona-enthusiast-text', content.personaEnthusiastText);
+
+    // 6. "Why Join?" (Benefits) Section
+    setElementText('why-join-title', content.whyJoinTitle);
+    setElementText('why-join-benefit1-title', content.whyJoinBenefit1Title);
+    setElementText('why-join-benefit1-text', content.whyJoinBenefit1Text);
+    setElementText('why-join-benefit2-title', content.whyJoinBenefit2Title);
+    setElementText('why-join-benefit2-text', content.whyJoinBenefit2Text);
+    setElementText('why-join-benefit3-title', content.whyJoinBenefit3Title);
+    setElementText('why-join-benefit3-text', content.whyJoinBenefit3Text);
 
     // 7. Partners Section
     setElementText('partners-title', content.partnersTitle);
     const partnersGrid = document.getElementById('partners-logo-grid');
-    if (partnersGrid && content.partnersLogos) { // Use partnersLogos
-        let partners = [];
-        if (typeof content.partnersLogos === 'string') {
-            try {
-                partners = JSON.parse(content.partnersLogos);
-            } catch (e) {
-                console.error("Could not parse partnersLogos JSON: ", e);
-                partners = [];
-            }
-        } else {
-            partners = Array.isArray(content.partnersLogos) ? content.partnersLogos : [];
-        }
-
+    if (partnersGrid && content.partnersLogos) {
+        let partners = parseJson(content.partnersLogos);
         partnersGrid.innerHTML = partners.map(partner => `
-            <div class="partner-logo fade-in" title="${partner.name}">
+            <div class="logo-item" title="${partner.name}">
                 <img src="${partner.logoUrl}" alt="${partner.name} Logo">
             </div>
         `).join('');
     }
 
-    // 8. Survey Section
-    setElementText('survey-title', content.formTitle); // Use formTitle
-    setElementText('survey-subtitle', content.formSubtitle); // Use formSubtitle
+    // 8. Mission/About Section
+    setElementText('about-title', content.aboutTitle);
+    setElementText('about-text', content.aboutText);
+    setElementText('about-cta', content.aboutCtaText);
 
-    // 9. Final CTA
+    // 9. Survey Form Section
+    setElementText('form-title', content.formTitle);
+    setElementText('form-subtitle', content.formSubtitle);
+
+    // 10. Final CTA
     setElementText('final-cta-title', content.finalCtaTitle);
     setElementText('final-cta-subtitle', content.finalCtaSubtitle);
-    const finalCtaLinks = document.getElementById('final-cta-links');
-    if (finalCtaLinks && content.socialLinks) { // We can re-use the socialLinks variable from above
-        let socialLinks = [];
-        if (typeof content.socialLinks === 'string') {
-             try {
-                socialLinks = JSON.parse(content.socialLinks);
-             } catch (e) {
-                 socialLinks = [];
-             }
-        } else {
-            socialLinks = Array.isArray(content.socialLinks) ? content.socialLinks : [];
-        }
-
-         finalCtaLinks.innerHTML = socialLinks.map(link => `
-            <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
-                Follow on ${link.name}
-            </a>
-        `).join('');
-    }
+    setElementText('final-cta-btn', content.finalCtaButtonText);
     
-    // 10. Footer
+    // 11. Footer
     setElementText('footer-text', content.footerText);
 }
 
@@ -252,123 +197,176 @@ function setElementText(id, text) {
 
 /**
 * Applies dynamic colors from the sheet to the :root.
-* (FIXED to match the user's colorTheme object)
 */
 function applyColors(colors) {
     const root = document.documentElement;
     const colorMap = {
-        'colorBgDark': colors.bgDark,
-        'colorBgDarkSurface': colors.bgDarkSurface,
-        'colorTextLight': colors.textLight,
-        'colorTextLightSecondary': colors.textLightSecondary,
-        'colorBorder': colors.bgDarkSurface, // Use a derived value
-        'colorAccent': colors.primaryYellow,
         'colorPrimaryBlue': colors.primaryBlue,
         'colorPrimaryRed': colors.primaryRed,
         'colorPrimaryOrange': colors.primaryOrange,
         'colorPrimaryYellow': colors.primaryYellow,
-        'colorPrimaryGreen': colors.primaryGreen
+        'colorPrimaryGreen': colors.primaryGreen,
+        'colorBgDark': colors.bgDark,
+        'colorBgDarkSurface': colors.bgDarkSurface,
+        'colorTextLight': colors.textLight,
+        'colorTextLightSecondary': colors.textLightSecondary,
+        'colorBgWhite': colors.bgWhite,
+        'colorTextSlate': colors.textSlate,
     };
     
     for (const [key, value] of Object.entries(colorMap)) {
         if (value) {
-            // Converts 'colorBgDark' to '--color-bg-dark'
+            // Converts 'colorPrimaryBlue' to '--color-primary-blue'
             const cssVar = `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
             root.style.setProperty(cssVar, value);
         }
     }
+
+    // Set derived semantic colors
+    root.style.setProperty('--color-background', colors.bgDark || '#1a1a2e');
+    root.style.setProperty('--color-surface', colors.bgDarkSurface || '#2a2a4c');
+    root.style.setProperty('--color-text-primary', colors.textLight || '#F0F0F0');
+    root.style.setProperty('--color-text-secondary', colors.textLightSecondary || '#b0b0d0');
+    root.style.setProperty('--color-accent', colors.primaryYellow || '#FDB813');
+    root.style.setProperty('--color-border', colors.bgDarkSurface || '#2a2a4c');
 }
 
+
 // ===============================
-// 2. FORM & SURVEY LOGIC
+// 2. FORM & SURVEY LOGIC (REWRITTEN)
 // ===============================
+
+let selectedPersona = 'creator'; // Default
+let currentStep = 1;
 
 function initFormLogic() {
     const surveyForm = document.getElementById('survey-form');
+    const nextBtn = document.getElementById('btn-next');
+    const prevBtn = document.getElementById('btn-prev');
+    const submitBtn = document.getElementById('btn-submit');
+    const personaToggles = document.querySelectorAll('.btn-toggle');
     const formSteps = document.querySelectorAll('.form-step');
-    const nextBtn = document.getElementById('form-next-btn');
-    const prevBtn = document.getElementById('form-prev-btn');
-    const submitBtn = document.getElementById('form-submit-btn');
-    const personaCards = document.querySelectorAll('.persona-card');
-    const formProgress = document.getElementById('form-progress-steps');
+    const progressBar = document.getElementById('form-progress-bar');
+    const totalSteps = formSteps.length;
 
-    let currentStep = 0;
-    let selectedPersona = '';
-
-    // Step 1: Persona Selection
-    personaCards.forEach(card => {
-        card.addEventListener('click', () => {
-            selectedPersona = card.dataset.persona;
-            document.getElementById('selected-persona-input').value = selectedPersona;
+    // --- Persona Toggle Logic ---
+    personaToggles.forEach(button => {
+        button.addEventListener('click', () => {
+            // Get new persona
+            selectedPersona = button.dataset.persona;
             
-            // Update UI
-            personaCards.forEach(c => c.classList.remove('selected'));
-            card.classList.add('selected');
+            // Update button UI
+            personaToggles.forEach(btn => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-selected', 'false');
+            });
+            button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
             
-            // Update next button
-            nextBtn.disabled = false;
-            setElementText('form-next-btn', `Continue as ${selectedPersona.charAt(0).toUpperCase() + selectedPersona.slice(1)}`);
-
-            // Show persona title on next step
-            setElementText('persona-specific-title', `${selectedPersona.charAt(0).toUpperCase() + selectedPersona.slice(1)} Questions`);
+            // Show/Hide question blocks (only if on step 2)
+            if (currentStep === 2) {
+                updatePersonaQuestions();
+            }
         });
     });
 
-    // Next Button Click
+    // --- Navigation Logic ---
     nextBtn.addEventListener('click', () => {
-        if (currentStep === 0) {
-            // Show the correct set of questions for the persona
-            ['creator', 'business', 'enthusiast'].forEach(persona => {
-                document.getElementById(`persona-${persona}-questions`).style.display = (persona === selectedPersona) ? 'block' : 'none';
-            });
-        }
-        
-        if (currentStep < formSteps.length - 1) {
+        if (validateStep(currentStep)) {
             goToStep(currentStep + 1);
         }
     });
 
-    // Prev Button Click
     prevBtn.addEventListener('click', () => {
-        if (currentStep > 0) {
-            goToStep(currentStep - 1);
-        }
+        goToStep(currentStep - 1);
     });
 
-    // Form Submission
+    // --- Form Submission ---
     surveyForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (currentStep === formSteps.length - 1) {
+        if (validateStep(currentStep)) {
             submitForm(surveyForm, submitBtn);
         }
     });
 
-    // Step Navigation Function
-    function goToStep(stepIndex) {
-        formSteps[currentStep].classList.remove('active');
-        formSteps[stepIndex].classList.add('active');
-        currentStep = stepIndex;
-
+    // --- Helper Functions ---
+    function goToStep(stepNumber) {
+        currentStep = stepNumber;
+        
+        // Hide all steps
+        formSteps.forEach(step => step.classList.remove('active'));
+        
+        // Show the new active step
+        const newStep = document.querySelector(`.form-step[data-step="${currentStep}"]`);
+        if (newStep) {
+            newStep.classList.add('active');
+        }
+        
+        // If we're on step 2, show the right persona questions
+        if (currentStep === 2) {
+            updatePersonaQuestions();
+        }
+        
         // Update button visibility
-        prevBtn.style.display = (currentStep > 0) ? 'inline-block' : 'none';
-        nextBtn.style.display = (currentStep < formSteps.length - 1) ? 'inline-block' : 'none';
-        submitBtn.style.display = (currentStep === formSteps.length - 1) ? 'inline-block' : 'none';
-
+        prevBtn.style.display = (currentStep === 1) ? 'none' : 'inline-block';
+        nextBtn.style.display = (currentStep === totalSteps) ? 'none' : 'inline-block';
+        submitBtn.style.display = (currentStep === totalSteps) ? 'inline-block' : 'none';
+        
         // Update progress bar
-        const progressSteps = formProgress.querySelectorAll('li');
-        progressSteps.forEach((step, index) => {
-            if (index < currentStep) {
-                step.className = 'complete';
-            } else if (index === currentStep) {
-                step.className = 'active';
+        const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
+        progressBar.style.width = `${progressPercent}%`;
+    }
+
+    function updatePersonaQuestions() {
+        document.querySelectorAll('.persona-questions').forEach(block => {
+            if (block.dataset.personaQuestions === selectedPersona) {
+                block.classList.add('active');
             } else {
-                step.className = '';
+                block.classList.remove('active');
             }
         });
     }
 
-    goToStep(0); // Initialize
+    // Initialize the form to step 1
+    goToStep(1);
 }
+
+/**
+ * Validates the current step's required fields.
+ */
+function validateStep(stepNumber) {
+    const currentStepEl = document.querySelector(`.form-step[data-step="${stepNumber}"]`);
+    if (!currentStepEl) return false;
+
+    let isValid = true;
+    // Find all required inputs *within the current step*
+    const requiredInputs = currentStepEl.querySelectorAll('[required], [data-required="true"]');
+    
+    requiredInputs.forEach(input => {
+        // Special check for persona-specific questions
+        const parentQuestions = input.closest('.persona-questions');
+        if (parentQuestions && !parentQuestions.classList.contains('active')) {
+            return; // Don't validate hidden persona questions
+        }
+
+        if (input.type === 'checkbox' || input.type === 'radio') {
+             // Logic for checkbox/radio groups
+        } else {
+            if (input.value.trim() === '') {
+                isValid = false;
+                input.classList.add('input-error');
+            } else {
+                input.classList.remove('input-error');
+            }
+        }
+    });
+
+    if (!isValid) {
+        showMessage('Please fill out all required fields (*).', 'error');
+    }
+    return isValid;
+}
+
 
 /**
  * Submits the form data to the Google Apps Script.
@@ -377,19 +375,20 @@ function submitForm(form, submitBtn) {
     const formData = new FormData(form);
     const data = {};
     
-    // Set initial button text
     const originalBtnText = submitBtn.textContent;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting...';
 
-    // 1. Basic Fields
+    // 1. Basic Fields (from Step 1 and 3)
     data.name = formData.get('name');
     data.email = formData.get('email');
-    data.persona = formData.get('persona');
-    data.message = formData.get('message');
     data.environment = formData.get('environment');
+    data.message = formData.get('message');
+    
+    // 2. Add the selected persona
+    data.persona = selectedPersona; // Get from the module-level variable
 
-    // 2. Persona-Specific Fields
+    // 3. Persona-Specific Fields (from Step 2)
     if (data.persona === 'creator') {
         data.creator_experience = formData.get('creator_experience');
         data.creator_income = formData.get('creator_income');
@@ -403,25 +402,22 @@ function submitForm(form, submitBtn) {
         data.enthusiast_motivation = formData.get('enthusiast_motivation');
     }
 
-    // 3. Send to Apps Script
+    // 4. Send to Apps Script
     fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        mode: 'cors', // Required for cross-origin
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     })
     .then(res => {
         if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`);
         }
-        // --- FINAL FIX ---
+        // --- HYBRID FIX (Correct) ---
         // We MUST use res.text() because doPost uses HtmlService
         return res.text();
     })
     .then(text => {
-        // Check if text is empty or not valid JSON
         if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
             console.error('Received non-JSON response from server:', text);
             throw new Error('Server returned an invalid response.');
@@ -431,9 +427,10 @@ function submitForm(form, submitBtn) {
         
         if (responseData.status === 'success') {
             showMessage('✅ Thank you! Your survey has been submitted.', 'success');
-            // Show the "Thank You" step
-            document.getElementById('form-steps-container').style.display = 'none';
-            document.getElementById('form-thank-you').style.display = 'block';
+            // Hide the form, show a thank you message
+            form.style.display = 'none';
+            document.getElementById('form-title').textContent = "Thank You!";
+            document.getElementById('form-subtitle').textContent = "Your voice has been heard. Follow us on social media to stay connected!";
         } else {
             throw new Error(responseData.message || 'An unknown error occurred.');
         }
@@ -450,22 +447,19 @@ function submitForm(form, submitBtn) {
 // 3. UI HELPERS (Message Box)
 // ===============================
 
-/**
- * Shows a success or error message pop-up.
- */
 function showMessage(message, type = 'info') {
     const msgBox = document.getElementById('message-box');
     const msgText = document.getElementById('message-text');
     const msgClose = document.getElementById('message-close-btn');
 
+    if (!msgBox || !msgText || !msgClose) return; // Fail gracefully
+
     msgText.textContent = message;
     msgBox.className = type; // 'success' or 'error'
     msgBox.classList.add('show');
 
-    // Close button
     msgClose.onclick = () => msgBox.classList.remove('show');
 
-    // Auto-hide
     setTimeout(() => {
         msgBox.classList.remove('show');
     }, 5000);
@@ -476,18 +470,19 @@ function showMessage(message, type = 'info') {
 // ===============================
 
 function initScrollAnimations() {
-    const fadeElements = document.querySelectorAll('.fade-in');
+    // This targets the SECTION elements, not the individual cards
+    const fadeElements = document.querySelectorAll('.scroll-fade');
 
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                // *** TYPO FIX WAS HERE ***
+                // *** TYPO FIX (v11) ***
                 observer.unobserve(entry.target); 
             }
         });
     }, {
-        threshold: 0.1 // Trigger when 10% of the element is visible
+        threshold: 0.1 
     });
 
     fadeElements.forEach(el => {
@@ -507,13 +502,13 @@ function initParticles() {
     const ctx = canvas.getContext('2d');
     let particlesArray = [];
     const particleCount = 70;
+    const heroElement = canvas.parentElement; // The #hero section
 
-    // Set canvas size
-    canvas.width = window.innerWidth;
-    let heroElement = canvas.parentElement;
-    // Ensure parent element has a height, otherwise fallback
-    canvas.height = heroElement ? heroElement.offsetHeight : 300;
-
+    function resizeCanvas() {
+        canvas.width = heroElement.clientWidth;
+        canvas.height = heroElement.clientHeight;
+        init();
+    }
 
     // Particle properties
     class Particle {
@@ -523,7 +518,10 @@ function initParticles() {
             this.size = Math.random() * 2 + 1;
             this.speedX = Math.random() * 0.5 - 0.25;
             this.speedY = Math.random() * 0.5 - 0.25;
-            this.color = 'rgba(253, 184, 19, 0.5)'; // Accent color
+            // Get color from CSS variable
+            this.color = getComputedStyle(document.documentElement)
+                         .getPropertyValue('--color-accent') || 'rgba(253, 184, 19, 0.5)';
+            this.color = this.color.trim() + '80'; // Add alpha
         }
         update() {
             if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
@@ -558,24 +556,13 @@ function initParticles() {
     }
 
     // Handle window resize
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        let heroElement = canvas.parentElement;
-        canvas.height = heroElement ? heroElement.offsetHeight : 300;
-        init();
-    });
+    window.addEventListener('resize', resizeCanvas);
 
-    // Initial check in case parentElement.offsetHeight is 0 on load
-    if (canvas.height === 0) {
-        setTimeout(() => {
-             let heroElement = canvas.parentElement;
-             canvas.height = heroElement ? heroElement.offsetHeight : 300;
-             init();
-        }, 100);
-    }
-
-    init();
-    animate();
+    // Initial setup
+    // We must wait a tick for the content to be populated and rendered
+    setTimeout(() => {
+        resizeCanvas();
+        animate();
+    }, 100); 
 }
-
 
