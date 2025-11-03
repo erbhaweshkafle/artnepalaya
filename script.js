@@ -107,7 +107,7 @@ function populateContent(content) {
                 socialLinks = [];
              }
         } else {
-            socialLinks = content.socialLinks || [];
+            socialLinks = Array.isArray(content.socialLinks) ? content.socialLinks : [];
         }
         
         socialNav.innerHTML = socialLinks.map(link => `
@@ -201,7 +201,7 @@ function populateContent(content) {
                 partners = [];
             }
         } else {
-            partners = content.partnersLogos || [];
+            partners = Array.isArray(content.partnersLogos) ? content.partnersLogos : [];
         }
 
         partnersGrid.innerHTML = partners.map(partner => `
@@ -228,7 +228,7 @@ function populateContent(content) {
                  socialLinks = [];
              }
         } else {
-            socialLinks = content.socialLinks || [];
+            socialLinks = Array.isArray(content.socialLinks) ? content.socialLinks : [];
         }
 
          finalCtaLinks.innerHTML = socialLinks.map(link => `
@@ -511,7 +511,10 @@ function initParticles() {
 
     // Set canvas size
     canvas.width = window.innerWidth;
-    canvas.height = canvas.parentElement.offsetHeight;
+    let heroElement = canvas.parentElement;
+    // Ensure parent element has a height, otherwise fallback
+    canvas.height = heroElement ? heroElement.offsetHeight : 300;
+
 
     // Particle properties
     class Particle {
@@ -558,9 +561,19 @@ function initParticles() {
     // Handle window resize
     window.addEventListener('resize', () => {
         canvas.width = window.innerWidth;
-        canvas.height = canvas.parentElement.offsetHeight;
+        let heroElement = canvas.parentElement;
+        canvas.height = heroElement ? heroElement.offsetHeight : 300;
         init();
     });
+
+    // Initial check in case parentElement.offsetHeight is 0 on load
+    if (canvas.height === 0) {
+        setTimeout(() => {
+             let heroElement = canvas.parentElement;
+             canvas.height = heroElement ? heroElement.offsetHeight : 300;
+             init();
+        }, 100);
+    }
 
     init();
     animate();
