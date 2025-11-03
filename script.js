@@ -1,5 +1,5 @@
 /*
- * ArtNepalaya Frontend Logic (v7 - JSON Mismatch Fix)
+ * ArtNepalaya Frontend Logic (v8 - Hybrid CORS Fix)
  *
  * This file handles:
  * 1. Fetching content from the Google Sheet CMS.
@@ -9,19 +9,19 @@
  * 5. Showing success/error messages.
  * 6. Scroll animations.
  *
- * --- NOTE ON CORS FIX ---
- * Google Apps Script (ContentService) does not allow setting CORS headers.
- * The backend (code.gs) now uses HtmlService as a workaround.
- * This means our response is NOT 'application/json', it's 'text/html' containing a JSON string.
- * We MUST use res.text() and then JSON.parse() to read the data.
+ * --- NOTE ON HYBRID CORS FIX ---
+ * doGet() (for loading) is a simple GET request. We can use ContentService
+ * and res.json() as Google adds the correct headers automatically.
+ *
+ * doPost() (for submitting) is a complex request. We MUST keep the
+ * HtmlService workaround (res.text() and JSON.parse()) to handle the preflight.
  */
 
 // ===============================
 // CONFIGURATION
 // ===============================
 //
-// !!! FIX APPLIED !!!
-// I have pasted your new, working URL here.
+// This URL is correct.
 //
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
@@ -50,19 +50,12 @@ function loadContent() {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
-            // --- CORS FIX ---
-            // The response is text, not JSON, so we must parse it manually.
-            return res.text();
+            // --- HYBRID FIX ---
+            // doGet is now a simple request, so we can use res.json()
+            return res.json();
         })
-        .then(text => {
-            // Check if text is empty or not valid JSON
-            if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
-                console.error('Received non-JSON response from server:', text);
-                throw new Error('Server returned an invalid response.');
-            }
-            
-            const data = JSON.parse(text);
-
+        .then(data => {
+            // Check for the response status from our script
             if (data.status === 'success') {
                 populateContent(data.content);
                 // Hide loader
@@ -412,8 +405,8 @@ function submitForm(form, submitBtn) {
         if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`);
         }
-        // --- CORS FIX ---
-        // The response is text, not JSON, so we must parse it manually.
+        // --- HYBRID FIX ---
+        // doPost MUST still use the HtmlService workaround (res.text())
         return res.text();
     })
     .then(text => {
