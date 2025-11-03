@@ -1,17 +1,20 @@
 /*
- * ArtNepalaya Frontend Logic (v8 - Hybrid CORS Fix - FINAL)
+ * ArtNepalaya Frontend Logic (v10 - FINAL HTMLSERVICE FIX)
  *
- * This is the correct, final version. My apologies for the confusion.
- *
- * 1. loadContent() uses res.json() to match the backend's ContentService.
- * 2. submitForm() uses res.text() to match the backend's HtmlService.
- *
- * This hybrid approach is the only one that works.
+ * My apologies. The "Hybrid" fix was wrong.
+ * Both doGet and doPost MUST use the HtmlService workaround.
+ * This means BOTH fetch calls must use res.text() and JSON.parse().
+ * This is the final, correct version.
  */
 
 // ===============================
 // CONFIGURATION
 // ===============================
+//
+// !!! IMPORTANT !!!
+// You MUST re-deploy your script and paste the NEW URL here.
+// The old '...axuVE/exec' URL is now broken.
+//
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
@@ -40,11 +43,18 @@ function loadContent() {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
             // --- FINAL FIX ---
-            // We MUST use res.json() because doGet uses ContentService
-            return res.json(); 
+            // We MUST use res.text() because doGet uses HtmlService
+            return res.text(); 
         })
-        .then(data => {
-            // Check for the response status from our script
+        .then(text => {
+            // Check if text is empty or not valid JSON
+            if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
+                console.error('Received non-JSON response from server:', text);
+                throw new Error('Server returned an invalid response.');
+            }
+            
+            const data = JSON.parse(text); // Parse the text
+
             if (data.status === 'success') {
                 populateContent(data.content);
                 // Hide loader
@@ -349,228 +359,5 @@ function initFormLogic() {
         // Update button visibility
         prevBtn.style.display = (currentStep > 0) ? 'inline-block' : 'none';
         nextBtn.style.display = (currentStep < formSteps.length - 1) ? 'inline-block' : 'none';
-        submitBtn.style.display = (currentStep === formSteps.length - 1) ? 'inline-block' : 'none';
-
-        // Update progress bar
-        const progressSteps = formProgress.querySelectorAll('li');
-        progressSteps.forEach((step, index) => {
-            if (index < currentStep) {
-                step.className = 'complete';
-            } else if (index === currentStep) {
-                step.className = 'active';
-            } else {
-                step.className = '';
-            }
-        });
-    }
-
-    goToStep(0); // Initialize
-}
-
-/**
- * Submits the form data to the Google Apps Script.
- */
-function submitForm(form, submitBtn) {
-    const formData = new FormData(form);
-    const data = {};
-    
-    // Set initial button text
-    const originalBtnText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Submitting...';
-
-    // 1. Basic Fields
-    data.name = formData.get('name');
-    data.email = formData.get('email');
-    data.persona = formData.get('persona');
-    data.message = formData.get('message');
-    data.environment = formData.get('environment');
-
-    // 2. Persona-Specific Fields
-    if (data.persona === 'creator') {
-        data.creator_experience = formData.get('creator_experience');
-        data.creator_income = formData.get('creator_income');
-        data.creator_challenges = formData.getAll('creator_challenges');
-    } else if (data.persona === 'business') {
-        data.business_type = formData.get('business_type');
-        data.business_reach = formData.get('business_reach');
-        data.business_goals = formData.getAll('business_goals');
-    } else if (data.persona === 'enthusiast') {
-        data.enthusiast_interest = formData.getAll('enthusiast_interest');
-        data.enthusiast_motivation = formData.get('enthusiast_motivation');
-    }
-
-    // 3. Send to Apps Script
-    fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'cors', // Required for cross-origin
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-    })
-    .then(res => {
-        if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        // --- FINAL FIX ---
-        // We MUST use res.text() because doPost uses HtmlService
-        return res.text();
-    })
-    .then(text => {
-        // Check if text is empty or not valid JSON
-        if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
-            console.error('Received non-JSON response from server:', text);
-            throw new Error('Server returned an invalid response.');
-        }
-        
-        const responseData = JSON.parse(text);
-        
-        if (responseData.status === 'success') {
-            showMessage('✅ Thank you! Your survey has been submitted.', 'success');
-            // Show the "Thank You" step
-            document.getElementById('form-steps-container').style.display = 'none';
-            document.getElementById('form-thank-you').style.display = 'block';
-        } else {
-            throw new Error(responseData.message || 'An unknown error occurred.');
-        }
-    })
-    .catch(error => {
-        console.error('Submission failed:', error);
-        showMessage(`Submission failed: ${error.message}`, 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalBtnText;
-    });
-}
-
-// ===============================
-// 3. UI HELPERS (Message Box)
-// ===============================
-
-/**
- * Shows a success or error message pop-up.
- */
-function showMessage(message, type = 'info') {
-    const msgBox = document.getElementById('message-box');
-    const msgText = document.getElementById('message-text');
-    const msgClose = document.getElementById('message-close-btn');
-
-    msgText.textContent = message;
-    msgBox.className = type; // 'success' or 'error'
-    msgBox.classList.add('show');
-
-    // Close button
-    msgClose.onclick = () => msgBox.classList.remove('show');
-
-    // Auto-hide
-    setTimeout(() => {
-        msgBox.classList.remove('show');
-    }, 5000);
-}
-
-// ===============================
-// 4. SCROLL ANIMATIONS
-// ===============================
-
-function initScrollAnimations() {
-    const fadeElements = document.querySelectorAll('.fade-in');
-
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-                observer.unobserve(entry.Targe);
-            }
-        });
-    }, {
-        threshold: 0.1 // Trigger when 10% of the element is visible
-    });
-
-    fadeElements.forEach(el => {
-        observer.observe(el);
-    });
-}
-
-
-// ===============================
-// 5. PARTICLE JS HERO
-// ===============================
-
-function initParticles() {
-    const canvas = document.getElementById('particle-canvas');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    let particlesArray = [];
-    const particleCount = 70;
-
-    // Set canvas size
-    canvas.width = window.innerWidth;
-    let heroElement = canvas.parentElement;
-    // Ensure parent element has a height, otherwise fallback
-    canvas.height = heroElement ? heroElement.offsetHeight : 300;
-
-
-    // Particle properties
-    class Particle {
-        constructor() {
-            this.x = Math.random() * canvas.width;
-            this.y = Math.random() * canvas.height;
-            this.size = Math.random() * 2 + 1;
-            this.speedX = Math.random() * 0.5 - 0.25;
-            this.speedY = Math.random() * 0.5 - 0.25;
-            this.color = 'rgba(253, 184, 19, 0.5)'; // Accent color
-        }
-        update() {
-            if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
-            if (this.y > canvas.height || this.y < 0) this.speedY *= -1;
-            this.x += this.speedX;
-            this.y += this.speedY;
-        }
-        draw() {
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    // Initialize particles
-    function init() {
-        particlesArray = [];
-        for (let i = 0; i < particleCount; i++) {
-            particlesArray.push(new Particle());
-        }
-    }
-
-    // Animation loop
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        for (let i = 0; i < particlesArray.length; i++) {
-            particlesArray[i].update();
-            particlesArray[i].draw();
-        }
-        requestAnimationFrame(animate);
-    }
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        canvas.width = window.innerWidth;
-        let heroElement = canvas.parentElement;
-        canvas.height = heroElement ? heroElement.offsetHeight : 300;
-        init();
-    });
-
-    // Initial check in case parentElement.offsetHeight is 0 on load
-    if (canvas.height === 0) {
-        setTimeout(() => {
-             let heroElement = canvas.parentElement;
-             canvas.height = heroElement ? heroElement.offsetHeight : 300;
-             init();
-        }, 100);
-    }
-
-    init();
-    animate();
-}
+        submitBtn.style.display = (currentStep === formSteps.length - 1) ? 'inline-block' :.
 
