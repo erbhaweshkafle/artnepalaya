@@ -18,7 +18,7 @@
 // You MUST paste your NEW deployment URL here
 // (after re-deploying the code.gs file)
 //
-const APPS_SCRIPT_URL = 'PASTE_YOUR_NEW_DEPLOYMENT_URL_HERE';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
 // DOMContentLoaded
@@ -627,4 +627,5 @@ function initParticles() {
         animate();
     }, 100); 
 }
+
 
