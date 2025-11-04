@@ -1,13 +1,13 @@
 /*
- * ArtNepalaya Frontend Logic (v12 - 2-Column Layout Update)
+ * ArtNepalaya Frontend Logic (v14 - Final)
  *
- * This version matches the "v12" HTML/CSS files.
- * - This JS matches the "v12" index.html and style.css
- * - loadContent() uses res.json() (for ContentService)
- * - submitForm() uses res.text() (for HtmlService)
- * - "entry.Targe" typo is fixed.
- * - Form logic is rewritten for "btn-next", etc.
- * - populateContent is updated for the new 2-column layouts.
+ * This is the final, correct, "Hybrid" version.
+ * - This JS matches the "v14" HTML/CSS files (Light theme, 6-col layout).
+ * - loadContent() uses res.json() (for ContentService).
+ * - submitForm() uses res.text() (for HtmlService).
+ * - NEW: initFab() for floating action button.
+ * - NEW: particle colors updated for light theme.
+ * - NEW: social link parser updated for FAB.
  */
 
 // ===============================
@@ -18,7 +18,7 @@
 // You MUST paste your NEW deployment URL here
 // (after re-deploying the code.gs file)
 //
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
+const APPS_SCRIPT_URL = 'script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
 
 // ===============================
 // DOMContentLoaded
@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadContent();
     initFormLogic();
     initScrollAnimations();
+    initFab(); // Initialize the new floating button
     // Particles are initialized *after* content loads
 });
 
@@ -116,22 +117,41 @@ function populateContent(content) {
     setElementText('hero-subtitle', content.heroSubtitle);
     setElementText('hero-cta', content.heroCtaText);
 
-    // 2. Social Links
+    // 2. Social Links (and FAB)
     const socialNav = document.getElementById('social-links-nav');
     const footerSocial = document.getElementById('footer-social-links');
-    if (socialNav && content.socialLinks) {
+    const fabFlyout = document.getElementById('fab-flyout'); // NEW FAB Menu
+    
+    if (content.socialLinks) {
         let socialLinks = parseJson(content.socialLinks);
         
-        const linksHtml = socialLinks.map(link => `
+        // Build header links
+        const headerLinksHtml = socialLinks.map(link => `
             <a href="${link.url}" target="_blank" rel="noopener noreferrer" title="${link.name}" class="social-icon">
                 <i class="icon-${link.name.toLowerCase()}"></i>
             </a>
         `).join('');
-        
-        socialNav.innerHTML = linksHtml;
-        if(footerSocial) {
-            footerSocial.innerHTML = linksHtml; // Also populate footer social
+        if (socialNav) socialNav.innerHTML = headerLinksHtml;
+        if (footerSocial) footerSocial.innerHTML = headerLinksHtml;
+
+        // Build FAB links (add WhatsApp)
+        let fabLinksHtml = socialLinks.map(link => `
+            <a href="${link.url}" target="_blank" rel="noopener noreferrer" title="${link.name}" class="social-icon-fab">
+                <i class="icon-${link.name.toLowerCase()}"></i>
+            </a>
+        `).join('');
+
+        // Add WhatsApp
+        if (content.whatsappNumber) {
+            // Format number to remove +
+            const whatsAppNum = String(content.whatsappNumber).replace(/[^0-9]/g, '');
+            fabLinksHtml += `
+            <a href="https://wa.me/${whatsAppNum}" target="_blank" rel="noopener noreferrer" title="WhatsApp" class="social-icon-fab">
+                <i class="icon-whatsapp"></i>
+            </a>`;
         }
+        
+        if (fabFlyout) fabFlyout.innerHTML = fabLinksHtml;
 
         // Find the "Instagram" link for the final CTA button
         const instaLink = socialLinks.find(link => link.name.toLowerCase() === 'instagram');
@@ -141,7 +161,7 @@ function populateContent(content) {
         }
     }
 
-    // 3. Pain Points (NEW 2-Col Layout)
+    // 3. Pain Points
     setElementText('pain-points-title', content.painPointsTitle);
     setElementText('pain-point1-title', content.painPoint1Title);
     setElementText('pain-point1-text', content.painPoint1Text);
@@ -150,7 +170,7 @@ function populateContent(content) {
     setElementText('pain-point3-title', content.painPoint3Title);
     setElementText('pain-point3-text', content.painPoint3Text);
 
-    // 4. "How It Works" Section (NEW 2-Col Layout)
+    // 4. "How It Works" Section
     setElementText('how-it-works-title', content.howItWorksTitle);
     setElementText('how-it-works-step1-title', content.howItWorksStep1Title);
     setElementText('how-it-works-step1-text', content.howItWorksStep1Text);
@@ -228,12 +248,10 @@ function applyColors(colors) {
         'colorPrimaryOrange': colors.primaryOrange,
         'colorPrimaryYellow': colors.primaryYellow,
         'colorPrimaryGreen': colors.primaryGreen,
-        'colorBgDark': colors.bgDark,
-        'colorBgDarkSurface': colors.bgDarkSurface,
-        'colorTextLight': colors.textLight,
-        'colorTextLightSecondary': colors.textLightSecondary,
+        'colorBgParchment': colors.bgParchment,
         'colorBgWhite': colors.bgWhite,
         'colorTextSlate': colors.textSlate,
+        'colorTextMuted': colors.textMuted,
     };
     
     for (const [key, value] of Object.entries(colorMap)) {
@@ -245,17 +263,18 @@ function applyColors(colors) {
     }
 
     // Set derived semantic colors
-    root.style.setProperty('--color-background', colors.bgDark || '#1a1a2e');
-    root.style.setProperty('--color-surface', colors.bgDarkSurface || '#2a2a4c');
-    root.style.setProperty('--color-text-primary', colors.textLight || '#F0F0F0');
-    root.style.setProperty('--color-text-secondary', colors.textLightSecondary || '#b0b0d0');
-    root.style.setProperty('--color-accent', colors.primaryYellow || '#FDB813');
-    root.style.setProperty('--color-border', colors.bgDarkSurface || '#2a2a4c');
+    root.style.setProperty('--color-background', colors.bgParchment || '#F5F1E8');
+    root.style.setProperty('--color-surface', colors.bgWhite || '#FFFFFF');
+    root.style.setProperty('--color-text-primary', colors.textSlate || '#333333');
+    root.style.setProperty('--color-text-secondary', colors.textMuted || '#555555');
+    root.style.setProperty('--color-accent', colors.primaryOrange || '#F58220');
+    root.style.setProperty('--color-border', '#e0e0e0');
+    root.style.setProperty('--color-shadow', 'rgba(0, 0, 0, 0.08)');
 }
 
 
 // ===============================
-// 2. FORM & SURVEY LOGIC (REWRITTEN)
+// 2. FORM & SURVEY LOGIC
 // ===============================
 
 let selectedPersona = 'creator'; // Default
@@ -276,18 +295,9 @@ function initFormLogic() {
     // --- Persona Toggle Logic ---
     personaToggles.forEach(button => {
         button.addEventListener('click', () => {
-            // Get new persona
             selectedPersona = button.dataset.persona;
-            
-            // Update button UI
-            personaToggles.forEach(btn => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-selected', 'false');
-            });
+            personaToggles.forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
-            button.setAttribute('aria-selected', 'true');
-            
-            // Show/Hide question blocks (only if on step 2)
             if (currentStep === 2) {
                 updatePersonaQuestions();
             }
@@ -320,27 +330,18 @@ function initFormLogic() {
     // --- Helper Functions ---
     function goToStep(stepNumber) {
         currentStep = stepNumber;
-        
-        // Hide all steps
         formSteps.forEach(step => step.classList.remove('active'));
-        
-        // Show the new active step
         const newStep = document.querySelector(`.form-step[data-step="${currentStep}"]`);
-        if (newStep) {
-            newStep.classList.add('active');
-        }
+        if (newStep) newStep.classList.add('active');
         
-        // If we're on step 2, show the right persona questions
         if (currentStep === 2) {
             updatePersonaQuestions();
         }
         
-        // Update button visibility
         if (prevBtn) prevBtn.style.display = (currentStep === 1) ? 'none' : 'inline-block';
         if (nextBtn) nextBtn.style.display = (currentStep === totalSteps) ? 'none' : 'inline-block';
         if (submitBtn) submitBtn.style.display = (currentStep === totalSteps) ? 'inline-block' : 'none';
         
-        // Update progress bar
         if (progressBar) {
             const progressPercent = ((currentStep - 1) / (totalSteps - 1)) * 100;
             progressBar.style.width = `${progressPercent}%`;
@@ -369,38 +370,19 @@ function validateStep(stepNumber) {
     if (!currentStepEl) return false;
 
     let isValid = true;
-    // Find all required inputs *within the current step*
     const requiredInputs = currentStepEl.querySelectorAll('[required], [data-required="true"]');
     
     requiredInputs.forEach(input => {
-        // Special check for persona-specific questions
         const parentQuestions = input.closest('.persona-questions');
         if (parentQuestions && !parentQuestions.classList.contains('active')) {
-            return; // Don't validate hidden persona questions
+            return; // Don't validate hidden
         }
-
-        if (input.type === 'checkbox' || input.type === 'radio') {
-             // Basic validation: check if at least one in a group is checked
-             const groupName = input.name;
-             if (groupName && input.dataset.required === "true") {
-                 const checked = currentStepEl.querySelector(`input[name="${groupName}"]:checked`);
-                 if (!checked) {
-                    isValid = false;
-                    // Find the label for this group to show error
-                    const groupLabel = document.getElementById(`${groupName}_label`);
-                    if(groupLabel) groupLabel.classList.add('input-error');
-                 } else {
-                    const groupLabel = document.getElementById(`${groupName}_label`);
-                    if(groupLabel) groupLabel.classList.remove('input-error');
-                 }
-             }
+        
+        if (input.value.trim() === '') {
+            isValid = false;
+            input.classList.add('input-error');
         } else {
-            if (input.value.trim() === '') {
-                isValid = false;
-                input.classList.add('input-error');
-            } else {
-                input.classList.remove('input-error');
-            }
+            input.classList.remove('input-error');
         }
     });
 
@@ -422,16 +404,12 @@ function submitForm(form, submitBtn) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Submitting...';
 
-    // 1. Basic Fields (from Step 1 and 3)
     data.name = formData.get('name');
     data.email = formData.get('email');
     data.environment = formData.get('environment');
     data.message = formData.get('message');
-    
-    // 2. Add the selected persona
-    data.persona = selectedPersona; // Get from the module-level variable
+    data.persona = selectedPersona; 
 
-    // 3. Persona-Specific Fields (from Step 2)
     if (data.persona === 'creator') {
         data.creator_experience = formData.get('creator_experience');
         data.creator_income = formData.get('creator_income');
@@ -445,7 +423,6 @@ function submitForm(form, submitBtn) {
         data.enthusiast_motivation = formData.get('enthusiast_motivation');
     }
 
-    // 4. Send to Apps Script
     fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'cors',
@@ -470,12 +447,9 @@ function submitForm(form, submitBtn) {
         
         if (responseData.status === 'success') {
             showMessage('✅ Thank you! Your survey has been submitted.', 'success');
-            // Hide the form, show a thank you message
             form.style.display = 'none';
-            // Also hide progress bar
             const progressBar = document.getElementById('form-progress');
             if(progressBar) progressBar.style.display = 'none';
-
             setElementText('form-title', "Thank You!");
             setElementText('form-subtitle', "Your voice has been heard. Follow us on social media to stay connected!");
         } else {
@@ -517,24 +491,17 @@ function showMessage(message, type = 'info') {
 // ===============================
 
 function initScrollAnimations() {
-    // This targets the SECTION elements, not the individual cards
     const fadeElements = document.querySelectorAll('.scroll-fade');
-
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 entry.target.classList.add('visible');
-                // *** TYPO FIX (v11) ***
                 observer.unobserve(entry.target); 
             }
         });
-    }, {
-        threshold: 0.1 
-    });
+    }, { threshold: 0.1 });
 
-    fadeElements.forEach(el => {
-        observer.observe(el);
-    });
+    fadeElements.forEach(el => observer.observe(el));
 }
 
 
@@ -558,7 +525,6 @@ function initParticles() {
         init();
     }
 
-    // Particle properties
     class Particle {
         constructor() {
             this.x = Math.random() * canvas.width;
@@ -566,22 +532,21 @@ function initParticles() {
             this.size = Math.random() * 2 + 1;
             this.speedX = Math.random() * 0.5 - 0.25;
             this.speedY = Math.random() * 0.5 - 0.25;
-            // Get color from CSS variable
-            let accentColor = getComputedStyle(document.documentElement)
-                                .getPropertyValue('--color-accent') || '#FDB813';
-            accentColor = accentColor.trim();
-            // Need to convert hex to rgba
+            // NEW Particle Color for Light Theme
+            let particleColor = getComputedStyle(document.documentElement)
+                                .getPropertyValue('--color-text-slate') || '#333333';
+            particleColor = particleColor.trim();
             let r=0, g=0, b=0;
-            if(accentColor.length === 7) {
-                r = parseInt(accentColor.substring(1, 3), 16);
-                g = parseInt(accentColor.substring(3, 5), 16);
-                b = parseInt(accentColor.substring(5, 7), 16);
-            } else if (accentColor.length === 4) {
-                r = parseInt(accentColor.substring(1, 2) + accentColor.substring(1, 2), 16);
-                g = parseInt(accentColor.substring(2, 3) + accentColor.substring(2, 3), 16);
-                b = parseInt(accentColor.substring(3, 4) + accentColor.substring(3, 4), 16);
+            if(particleColor.length === 7) {
+                r = parseInt(particleColor.substring(1, 3), 16);
+                g = parseInt(particleColor.substring(3, 5), 16);
+                b = parseInt(particleColor.substring(5, 7), 16);
+            } else if (particleColor.length === 4) {
+                r = parseInt(particleColor.substring(1, 2) + particleColor.substring(1, 2), 16);
+                g = parseInt(particleColor.substring(2, 3) + particleColor.substring(2, 3), 16);
+                b = parseInt(particleColor.substring(3, 4) + particleColor.substring(3, 4), 16);
             }
-            this.color = `rgba(${r}, ${g}, ${b}, 0.5)`;
+            this.color = `rgba(${r}, ${g}, ${b}, 0.3)`; // Muted dark particles
         }
         update() {
             if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
@@ -597,7 +562,6 @@ function initParticles() {
         }
     }
 
-    // Initialize particles
     function init() {
         particlesArray = [];
         if (canvas.width === 0 || canvas.height === 0) return;
@@ -606,7 +570,6 @@ function initParticles() {
         }
     }
 
-    // Animation loop
     function animate() {
         if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -617,15 +580,30 @@ function initParticles() {
         requestAnimationFrame(animate);
     }
 
-    // Handle window resize
     window.addEventListener('resize', resizeCanvas);
-
-    // Initial setup
-    // We must wait a tick for the content to be populated and rendered
     setTimeout(() => {
         resizeCanvas();
         animate();
     }, 100); 
 }
 
+// ===============================
+// 6. FLOATING ACTION BUTTON (FAB)
+// ===============================
+function initFab() {
+    const fabContainer = document.getElementById('fab-container');
+    const fabMainBtn = document.getElementById('fab-main-btn');
 
+    if (fabMainBtn) {
+        fabMainBtn.addEventListener('click', () => {
+            fabContainer.classList.toggle('active');
+        });
+    }
+
+    // Optional: Close FAB if user clicks outside of it
+    document.addEventListener('click', (e) => {
+        if (fabContainer && !fabContainer.contains(e.target) && fabContainer.classList.contains('active')) {
+            fabContainer.classList.remove('active');
+        }
+    });
+}
