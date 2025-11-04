@@ -1,6 +1,6 @@
 /*
- * ArtNepalaya Brand Styles (v9 - Dark Mode, Arty)
- * This file matches the "v9" index.html structure.
+ * ArtNepalaya Brand Styles (v12 - 2-Column Layout Update)
+ * This file matches the "v12" index.html structure.
  */
 
 /* ---------------------------------- */
@@ -293,33 +293,52 @@ section { padding: 5rem 0; }
     background-color: var(--color-surface);
 }
 
-/* Steps / Pain Points / How-to */
-.steps-container {
+/* * NEW 2-COLUMN LAYOUT (v12)
+ * Used for "Pain Points" and "How It Works"
+ */
+.section-grid-2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
+    grid-template-columns: 1fr 2fr;
+    gap: 3rem;
+    align-items: center;
 }
-.step-card {
+.section-grid-2 .section-title-col h2 {
+    text-align: left;
+    margin: 0;
+}
+.section-grid-2 .section-title-col h2::after {
+    margin: 0.75rem 0 0; /* Align left */
+}
+.feature-list-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.feature-item {
     background: var(--color-background); /* Swapped for contrast */
-    padding: 2rem;
+    padding: 1.5rem;
     border-radius: var(--border-radius);
     border: 1px solid var(--color-border);
-    transition: var(--transition-speed);
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
 }
-.step-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-md);
-}
-.step-icon {
-    width: 50px;
-    height: 50px;
-    margin-bottom: 1rem;
+.feature-item-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
     color: var(--color-accent);
 }
-.step-icon svg {
-    width: 100%;
-    height: 100%;
+.feature-item-icon svg { width: 100%; height: 100%; }
+.feature-item-text h3 {
+    font-size: 1.15rem;
+    margin-bottom: 0.25rem;
 }
+.feature-item-text p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
 
 /* Who Is It For (Personas) */
 .persona-container {
@@ -549,8 +568,6 @@ textarea { resize: vertical; }
 /* ---------------------------------- */
 /* 10. Icon Font (Placeholder)      */
 /* ---------------------------------- */
-/* This is a simple placeholder. 
-   For production, you'd use a real icon font like FontAwesome. */
 [class^="icon-"]::before {
     display: inline-block;
     font-style: normal;
@@ -571,7 +588,21 @@ textarea { resize: vertical; }
         flex-direction: column;
         gap: 1rem;
     }
-    .persona-container, .steps-container {
+    
+    /* NEW 2-Col Responsive */
+    .section-grid-2 {
+        grid-template-columns: 1fr; /* Stack columns on mobile */
+        gap: 2rem;
+    }
+    .section-grid-2 .section-title-col h2 {
+        text-align: center; /* Center title on mobile */
+    }
+    .section-grid-2 .section-title-col h2::after {
+        margin: 0.75rem auto 0; /* Center underline */
+    }
+
+
+    .persona-container {
         grid-template-columns: 1fr;
     }
     #persona-toggle {
@@ -587,3 +618,4 @@ textarea { resize: vertical; }
         text-align: center;
     }
 }
+
