@@ -1,12 +1,13 @@
 /*
- * ArtNepalaya Frontend Logic (v9 - HTML Mismatch Fix)
+ * ArtNepalaya Frontend Logic (v12 - 2-Column Layout Update)
  *
- * This is the final, correct, "Hybrid" version.
- * - This JS matches the "v9" index.html and style.css
+ * This version matches the "v12" HTML/CSS files.
+ * - This JS matches the "v12" index.html and style.css
  * - loadContent() uses res.json() (for ContentService)
  * - submitForm() uses res.text() (for HtmlService)
  * - "entry.Targe" typo is fixed.
  * - Form logic is rewritten for "btn-next", etc.
+ * - populateContent is updated for the new 2-column layouts.
  */
 
 // ===============================
@@ -17,7 +18,7 @@
 // You MUST paste your NEW deployment URL here
 // (after re-deploying the code.gs file)
 //
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxzKx2lP66Cmy0aLYkJlJkUfYzQcCt1K0NPs3rJ6ppr8_SJUhLTYEFuky42uENaxuVE/exec';
+const APPS_SCRIPT_URL = 'PASTE_YOUR_NEW_DEPLOYMENT_URL_HERE';
 
 // ===============================
 // DOMContentLoaded
@@ -140,7 +141,7 @@ function populateContent(content) {
         }
     }
 
-    // 3. Pain Points
+    // 3. Pain Points (NEW 2-Col Layout)
     setElementText('pain-points-title', content.painPointsTitle);
     setElementText('pain-point1-title', content.painPoint1Title);
     setElementText('pain-point1-text', content.painPoint1Text);
@@ -149,7 +150,7 @@ function populateContent(content) {
     setElementText('pain-point3-title', content.painPoint3Title);
     setElementText('pain-point3-text', content.painPoint3Text);
 
-    // 4. "How It Works" Section
+    // 4. "How It Works" Section (NEW 2-Col Layout)
     setElementText('how-it-works-title', content.howItWorksTitle);
     setElementText('how-it-works-step1-title', content.howItWorksStep1Title);
     setElementText('how-it-works-step1-text', content.howItWorksStep1Text);
@@ -626,3 +627,4 @@ function initParticles() {
         animate();
     }, 100); 
 }
+
