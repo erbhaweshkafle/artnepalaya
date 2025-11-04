@@ -1,10 +1,14 @@
 /*
- * ArtNepalaya Frontend Logic (v15 - FINAL)
+ * ArtNepalaya Frontend Logic (v14 - Final)
  *
- * This version matches the "v15" code.gs.
- * - loadContent() uses res.json().
- * - submitForm() NOW ALSO uses res.json() (no more text/parse).
- * - This is the final, correct, and simplest logic.
+ * This is the final, correct, "Hybrid" version.
+ * - This JS matches the "v14" HTML/CSS files.
+ * - loadContent() uses res.json() (for ContentService).
+ * - submitForm() uses res.text() (for HtmlService).
+ * - NEW: initFab() for floating action button.
+ * - NEW: particle colors updated for light theme.
+ * - NEW: social link parser updated for FAB.
+ * - FIX: "entry.Targe" typo is fixed.
  */
 
 // ===============================
@@ -13,7 +17,7 @@
 //
 // !!! IMPORTANT !!!
 // You MUST paste your NEW deployment URL here
-// (after re-deploying the new code.gs file)
+// (after re-deploying the code.gs file)
 //
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyqaOlkRQEQ3PhWcAwoKHMMJWcxGcGva57l5KzjrSGFQoYBkTIoprRoTt6lumkuzWd4/exec';
 
@@ -52,8 +56,8 @@ function loadContent() {
             if (!res.ok) {
                 throw new Error(`HTTP error! status: ${res.status}`);
             }
-            // --- FINAL FIX ---
-            // We use res.json() because doGet uses ContentService
+            // --- HYBRID FIX (Correct) ---
+            // We MUST use res.json() because doGet uses ContentService
             return res.json(); 
         })
         .then(data => {
@@ -430,12 +434,18 @@ function submitForm(form, submitBtn) {
         if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`);
         }
-        // --- FINAL FIX (v15) ---
-        // We MUST use res.json() because doPost now uses ContentService
-        return res.json(); 
+        // --- HYBRID FIX (Correct) ---
+        // We MUST use res.text() because doPost uses HtmlService
+        return res.text();
     })
-    .then(responseData => {
-        // Check for the response status from our script
+    .then(text => {
+        if (!text || (text.charAt(0) !== '{' && text.charAt(0) !== '[')) {
+            console.error('Received non-JSON response from server:', text);
+            throw new Error('Server returned an invalid response.');
+        }
+        
+        const responseData = JSON.parse(text);
+        
         if (responseData.status === 'success') {
             showMessage('✅ Thank you! Your survey has been submitted.', 'success');
             form.style.display = 'none';
