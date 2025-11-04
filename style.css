@@ -1,5 +1,5 @@
 /*
- * ArtNepalaya Brand Styles (v14 - Light Theme & 6-col Layout)
+ * ArtNepalaya Brand Styles (v14 - UI Fixes)
  * - Switched to Parchment/White light theme
  * - New 6-col/6-col "featurette" layout
  * - New Floating Action Button (FAB)
@@ -675,6 +675,11 @@ textarea { resize: vertical; }
     text-decoration: none;
     font-size: 1.5rem;
     border: 1px solid var(--color-border);
+}
+/* FIX: Center FAB icons */
+.social-icon-fab i::before {
+    font-size: 1.5rem;
+    line-height: 1;
 }
 .social-icon-fab:hover {
     background: var(--color-accent);
